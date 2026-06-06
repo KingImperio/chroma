@@ -43,7 +43,8 @@
     hueTrack: document.getElementById("hue-track"),
     hueThumb: document.getElementById("hue-thumb"),
     pickerReadout: document.getElementById("picker-readout"),
-    pickerClose: document.getElementById("picker-close")
+    pickerClose: document.getElementById("picker-close"),
+    formatTabs: document.querySelectorAll(".format-tab")
   };
 
   const state = {
@@ -53,7 +54,8 @@
     pickerOpen: false,
     pickerHue: 217,
     pickerSat: 1,
-    pickerLight: 0.5
+    pickerLight: 0.5,
+    format: "hex"
   };
 
   function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
@@ -123,6 +125,176 @@
   function hslToHex(h, s, l) {
     const { r, g, b } = hslToRgb(h, s, l);
     return rgbToHex(r, g, b);
+  }
+
+  function rgbToHsv(r, g, b) {
+    const rf = r / 255, gf = g / 255, bf = b / 255;
+    const max = Math.max(rf, gf, bf), min = Math.min(rf, gf, bf);
+    const v = max;
+    const d = max - min;
+    let s = max === 0 ? 0 : d / max;
+    let h = 0;
+    if (d !== 0) {
+      switch (max) {
+        case rf: h = (gf - bf) / d + (gf < bf ? 6 : 0); break;
+        case gf: h = (bf - rf) / d + 2; break;
+        case bf: h = (rf - gf) / d + 4; break;
+      }
+      h *= 60;
+    }
+    return { h, s, v };
+  }
+
+  function hsvToRgb(h, s, v) {
+    h = ((h % 360) + 360) % 360;
+    s = clamp(s, 0, 1);
+    v = clamp(v, 0, 1);
+    const c = v * s;
+    const hp = h / 60;
+    const x = c * (1 - Math.abs((hp % 2) - 1));
+    let r1 = 0, g1 = 0, b1 = 0;
+    if (hp < 1)      { r1 = c; g1 = x; }
+    else if (hp < 2) { r1 = x; g1 = c; }
+    else if (hp < 3) { g1 = c; b1 = x; }
+    else if (hp < 4) { g1 = x; b1 = c; }
+    else if (hp < 5) { r1 = x; b1 = c; }
+    else             { r1 = c; b1 = x; }
+    const m = v - c;
+    return {
+      r: Math.round((r1 + m) * 255),
+      g: Math.round((g1 + m) * 255),
+      b: Math.round((b1 + m) * 255)
+    };
+  }
+
+  function formatRgb(r, g, b) {
+    return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+  }
+
+  function formatHsl(h, s, l) {
+    const hh = Math.round(h);
+    const ss = Math.round(s * 100);
+    const ll = Math.round(l * 100);
+    return `hsl(${hh}, ${ss}%, ${ll}%)`;
+  }
+
+  function formatHsv(h, s, v) {
+    const hh = Math.round(h);
+    const ss = Math.round(s * 100);
+    const vv = Math.round(v * 100);
+    return `hsv(${hh}, ${ss}%, ${vv}%)`;
+  }
+
+  const NUMBER_RE = /-?\d+(?:\.\d+)?/g;
+
+  function parseRgbString(input) {
+    if (input == null) return null;
+    const s = String(input).trim().toLowerCase();
+    const open = s.indexOf("(");
+    const close = s.lastIndexOf(")");
+    const inner = open >= 0 && close > open ? s.slice(open + 1, close) : s;
+    const nums = inner.match(NUMBER_RE);
+    if (!nums || nums.length < 3) return null;
+    const r = parseFloat(nums[0]);
+    const g = parseFloat(nums[1]);
+    const b = parseFloat(nums[2]);
+    if (![r, g, b].every(Number.isFinite)) return null;
+    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) return null;
+    return { r, g, b };
+  }
+
+  function parseHslString(input) {
+    if (input == null) return null;
+    const s = String(input).trim().toLowerCase();
+    const open = s.indexOf("(");
+    const close = s.lastIndexOf(")");
+    const inner = open >= 0 && close > open ? s.slice(open + 1, close) : s;
+    const nums = inner.match(NUMBER_RE);
+    if (!nums || nums.length < 3) return null;
+    const h = parseFloat(nums[0]);
+    const sat = parseFloat(nums[1]);
+    const l = parseFloat(nums[2]);
+    if (![h, sat, l].every(Number.isFinite)) return null;
+    if (h < 0 || h > 360 || sat < 0 || sat > 100 || l < 0 || l > 100) return null;
+    return { h, s: sat / 100, l: l / 100 };
+  }
+
+  function parseHsvString(input) {
+    if (input == null) return null;
+    const s = String(input).trim().toLowerCase();
+    const open = s.indexOf("(");
+    const close = s.lastIndexOf(")");
+    const inner = open >= 0 && close > open ? s.slice(open + 1, close) : s;
+    const nums = inner.match(NUMBER_RE);
+    if (!nums || nums.length < 3) return null;
+    const h = parseFloat(nums[0]);
+    const sat = parseFloat(nums[1]);
+    const v = parseFloat(nums[2]);
+    if (![h, sat, v].every(Number.isFinite)) return null;
+    if (h < 0 || h > 360 || sat < 0 || sat > 100 || v < 0 || v > 100) return null;
+    return { h, s: sat / 100, v: v / 100 };
+  }
+
+  function parseAnyColor(input) {
+    if (input == null) return null;
+    const raw = String(input).trim();
+    if (!raw) return null;
+    const hex = normalizeHex(raw);
+    if (hex) return { kind: "hex", hex };
+    const lower = raw.toLowerCase();
+    if (lower.startsWith("rgb")) {
+      const rgb = parseRgbString(raw);
+      if (rgb) return { kind: "rgb", hex: rgbToHex(rgb.r, rgb.g, rgb.b), rgb };
+    }
+    if (lower.startsWith("hsl")) {
+      const hsl = parseHslString(raw);
+      if (hsl) return { kind: "hsl", hex: hslToHex(hsl.h, hsl.s, hsl.l), hsl };
+    }
+    if (lower.startsWith("hsv") || lower.startsWith("hsb")) {
+      const hsv = parseHsvString(raw);
+      if (hsv) {
+        const { r, g, b } = hsvToRgb(hsv.h, hsv.s, hsv.v);
+        return { kind: "hsv", hex: rgbToHex(r, g, b), hsv };
+      }
+    }
+    const rgb = parseRgbString(raw);
+    if (rgb) return { kind: "rgb", hex: rgbToHex(rgb.r, rgb.g, rgb.b), rgb };
+    return null;
+  }
+
+  function formatInputValue(hex, format) {
+    if (!hex) return "";
+    const rgb = hexToRgb(hex);
+    switch (format) {
+      case "hex": return hex.slice(1);
+      case "rgb": return formatRgb(rgb.r, rgb.g, rgb.b);
+      case "hsl": {
+        const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+        return formatHsl(hsl.h, hsl.s, hsl.l);
+      }
+      case "hsv": {
+        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+        return formatHsv(hsv.h, hsv.s, hsv.v);
+      }
+      default: return hex.slice(1);
+    }
+  }
+
+  function formatColorVar(hex, format) {
+    const rgb = hexToRgb(hex);
+    switch (format) {
+      case "hex": return hex;
+      case "rgb": return formatRgb(rgb.r, rgb.g, rgb.b);
+      case "hsl": {
+        const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+        return formatHsl(hsl.h, hsl.s, hsl.l);
+      }
+      case "hsv": {
+        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+        return formatHsv(hsv.h, hsv.s, hsv.v);
+      }
+      default: return hex;
+    }
   }
 
   function relLuminance(r, g, b) {
@@ -289,18 +461,13 @@
   }
 
   function renderCodeBlock(palette) {
-    const lines = [":root {"];
-    palette.forEach((c, i) => {
-      const n = String(i + 1).padStart(2, "0");
-      lines.push(`  --color-${n}: ${c.hex};`);
-    });
-    lines.push("}");
-    const body = lines.join("\n");
+    const fmt = state.format;
     els.codeContent.innerHTML =
       `<span class="tk-sel">:root</span> {\n` +
       palette.map((c, i) => {
         const n = String(i + 1).padStart(2, "0");
-        return `  <span class="tk-prop">--color-${n}</span>: <span class="tk-val">${c.hex}</span>;`;
+        const val = formatColorVar(c.hex, fmt);
+        return `  <span class="tk-prop">--color-${n}</span>: <span class="tk-val">${val}</span>;`;
       }).join("\n") +
       `\n}`;
   }
@@ -336,20 +503,43 @@
   let debounceId = null;
   function onHexInput() {
     const raw = els.hexInput.value;
-    const normalized = normalizeHex(raw);
-    if (normalized) {
+    const parsed = parseAnyColor(raw);
+    if (parsed) {
       setHexError("");
-      els.hexSwatch.style.background = normalized;
-      state.baseHex = normalized;
-      setAccent(normalized);
+      els.hexSwatch.style.background = parsed.hex;
+      state.baseHex = parsed.hex;
+      setAccent(parsed.hex);
       if (state.pickerOpen) {
-        syncPickerFromHex(normalized);
+        syncPickerFromHex(parsed.hex);
       }
       clearTimeout(debounceId);
       debounceId = setTimeout(regenerate, 200);
     } else {
-      setHexError("Invalid hex");
+      setHexError("Invalid color");
     }
+  }
+
+  function setFormat(format) {
+    if (!["hex", "rgb", "hsl", "hsv"].includes(format)) return;
+    state.format = format;
+    els.formatTabs.forEach(tab => {
+      const active = tab.dataset.format === format;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    els.hexInput.value = formatInputValue(state.baseHex, format);
+    renderCodeBlock(state.palette);
+    if (state.pickerOpen) {
+      els.pickerReadout.textContent = formatInputValue(state.baseHex, format);
+    }
+  }
+
+  function onFormatClick(e) {
+    const tab = e.target.closest(".format-tab");
+    if (!tab) return;
+    setFormat(tab.dataset.format);
+    els.hexInput.focus();
+    els.hexInput.select();
   }
 
   function onHarmonyChange() {
@@ -359,17 +549,17 @@
 
   function onGenerateSubmit(e) {
     e.preventDefault();
-    const normalized = normalizeHex(els.hexInput.value);
-    if (!normalized) {
-      setHexError("Invalid hex");
+    const parsed = parseAnyColor(els.hexInput.value);
+    if (!parsed) {
+      setHexError("Invalid color");
       els.hexInput.focus();
       return;
     }
-    state.baseHex = normalized;
-    els.hexInput.value = normalized.slice(1);
-    els.hexSwatch.style.background = normalized;
-    setAccent(normalized);
-    if (state.pickerOpen) syncPickerFromHex(normalized);
+    state.baseHex = parsed.hex;
+    els.hexInput.value = formatInputValue(parsed.hex, state.format);
+    els.hexSwatch.style.background = parsed.hex;
+    setAccent(parsed.hex);
+    if (state.pickerOpen) syncPickerFromHex(parsed.hex);
     regenerate();
   }
 
@@ -383,7 +573,7 @@
   function onRandom() {
     const hex = randomHex();
     state.baseHex = hex;
-    els.hexInput.value = hex.slice(1);
+    els.hexInput.value = formatInputValue(hex, state.format);
     els.hexSwatch.style.background = hex;
     setAccent(hex);
     setHexError("");
@@ -418,10 +608,11 @@
   }
 
   function buildCssText() {
+    const fmt = state.format;
     return [":root {"]
       .concat(state.palette.map((c, i) => {
         const n = String(i + 1).padStart(2, "0");
-        return `  --color-${n}: ${c.hex};`;
+        return `  --color-${n}: ${formatColorVar(c.hex, fmt)};`;
       }))
       .concat(["}"])
       .join("\n");
@@ -498,7 +689,7 @@
     const { h, s, l } = rgbToHsl(...Object.values(hexToRgb(hex)));
     setPickerHue(h);
     setPickerSL(s, l);
-    els.pickerReadout.textContent = hex;
+    els.pickerReadout.textContent = formatInputValue(hex, state.format);
   }
 
   function openPicker() {
@@ -528,9 +719,10 @@
   function applyPicker() {
     const hex = hslToHex(state.pickerHue, state.pickerSat, state.pickerLight);
     state.baseHex = hex;
-    els.hexInput.value = hex.slice(1);
+    const display = formatInputValue(hex, state.format);
+    els.hexInput.value = display;
     els.hexSwatch.style.background = hex;
-    els.pickerReadout.textContent = hex;
+    els.pickerReadout.textContent = display;
     setAccent(hex);
     setHexError("");
     clearTimeout(debounceId);
@@ -647,7 +839,7 @@
     const initial = normalizeHex(els.hexInput.value) || "#3B82F6";
     state.baseHex = initial;
     state.harmony = els.harmony.value;
-    els.hexInput.value = initial.slice(1);
+    els.hexInput.value = formatInputValue(initial, state.format);
     els.hexSwatch.style.background = initial;
     setAccent(initial);
     setHexError("");
@@ -673,6 +865,10 @@
     document.addEventListener("mousedown", onPickerOutside);
     document.addEventListener("touchstart", onPickerOutside, { passive: true });
     document.addEventListener("keydown", onPickerKey);
+
+    els.formatTabs.forEach(tab => {
+      tab.addEventListener("click", onFormatClick);
+    });
   }
 
   if (document.readyState === "loading") {

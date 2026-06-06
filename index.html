@@ -23,6 +23,12 @@
   <form id="controls" class="controls" novalidate>
     <div class="field">
       <label for="hex-input" class="field-label">Base color</label>
+      <div class="format-tabs" role="tablist" aria-label="Color format">
+        <button type="button" class="format-tab is-active" role="tab" aria-selected="true" data-format="hex">HEX</button>
+        <button type="button" class="format-tab" role="tab" aria-selected="false" data-format="rgb">RGB</button>
+        <button type="button" class="format-tab" role="tab" aria-selected="false" data-format="hsl">HSL</button>
+        <button type="button" class="format-tab" role="tab" aria-selected="false" data-format="hsv">HSV</button>
+      </div>
       <div class="hex-row">
         <span class="hex-prefix" aria-hidden="true">#</span>
         <input
