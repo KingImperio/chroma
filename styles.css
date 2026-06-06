@@ -579,6 +579,20 @@ body::before {
 .code-block code .tk-val { color: var(--text-primary); }
 .code-block code .tk-sel { color: var(--accent); }
 
+.signature {
+  position: fixed;
+  left: var(--space-4);
+  bottom: var(--space-3);
+  margin: 0;
+  font-size: var(--fs-12);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  user-select: none;
+  pointer-events: none;
+  z-index: 3;
+}
+
 @media (min-width: 720px) {
   body { flex-direction: row; align-items: stretch; }
   .sidebar {
@@ -586,7 +600,7 @@ body::before {
     min-width: var(--sidebar-w);
     border-right: 1px solid var(--border-subtle);
     border-bottom: none;
-    padding: var(--space-8) var(--space-6);
+    padding: var(--space-8) var(--space-6) var(--space-12);
     height: 100vh;
     height: 100dvh;
     position: sticky;
@@ -599,6 +613,10 @@ body::before {
   }
   .swatches {
     grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .signature {
+    left: var(--space-5);
+    bottom: var(--space-4);
   }
 }
 
