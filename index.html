@@ -36,9 +36,36 @@
           aria-describedby="hex-error"
           value="3B82F6"
         />
-        <span class="hex-swatch" id="hex-swatch" aria-hidden="true"></span>
+        <button
+          type="button"
+          id="hex-swatch"
+          class="hex-swatch"
+          aria-label="Open color picker"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+        ></button>
       </div>
       <p class="field-error" id="hex-error" role="alert" aria-live="polite"></p>
+
+      <div class="picker" id="picker" role="dialog" aria-label="Color picker" hidden>
+        <div
+          class="picker-area"
+          id="picker-area"
+          role="application"
+          aria-label="Color saturation and lightness"
+          tabindex="0"
+        >
+          <div class="picker-cursor" id="picker-cursor" aria-hidden="true"></div>
+        </div>
+        <div class="picker-hue-track" id="hue-track" role="slider"
+             aria-label="Hue" aria-valuemin="0" aria-valuemax="360" aria-valuenow="217" tabindex="0">
+          <div class="picker-hue-thumb" id="hue-thumb" aria-hidden="true"></div>
+        </div>
+        <div class="picker-foot">
+          <span class="picker-readout" id="picker-readout">#3B82F6</span>
+          <button type="button" class="picker-close" id="picker-close">Done</button>
+        </div>
+      </div>
     </div>
 
     <div class="field">

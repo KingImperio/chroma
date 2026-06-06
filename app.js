@@ -36,13 +36,24 @@
     paletteSub: document.getElementById("palette-sub"),
     codeContent: document.getElementById("code-content"),
     codeBlock: document.getElementById("code-block"),
-    copyAllBtn: document.getElementById("copy-all-btn")
+    copyAllBtn: document.getElementById("copy-all-btn"),
+    picker: document.getElementById("picker"),
+    pickerArea: document.getElementById("picker-area"),
+    pickerCursor: document.getElementById("picker-cursor"),
+    hueTrack: document.getElementById("hue-track"),
+    hueThumb: document.getElementById("hue-thumb"),
+    pickerReadout: document.getElementById("picker-readout"),
+    pickerClose: document.getElementById("picker-close")
   };
 
   const state = {
     baseHex: "#3B82F6",
     harmony: "monochromatic",
-    palette: []
+    palette: [],
+    pickerOpen: false,
+    pickerHue: 217,
+    pickerSat: 1,
+    pickerLight: 0.5
   };
 
   function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
@@ -331,6 +342,9 @@
       els.hexSwatch.style.background = normalized;
       state.baseHex = normalized;
       setAccent(normalized);
+      if (state.pickerOpen) {
+        syncPickerFromHex(normalized);
+      }
       clearTimeout(debounceId);
       debounceId = setTimeout(regenerate, 200);
     } else {
@@ -355,6 +369,7 @@
     els.hexInput.value = normalized.slice(1);
     els.hexSwatch.style.background = normalized;
     setAccent(normalized);
+    if (state.pickerOpen) syncPickerFromHex(normalized);
     regenerate();
   }
 
@@ -372,6 +387,7 @@
     els.hexSwatch.style.background = hex;
     setAccent(hex);
     setHexError("");
+    if (state.pickerOpen) syncPickerFromHex(hex);
     regenerate();
   }
 
@@ -459,6 +475,174 @@
     }
   }
 
+  function setPickerHue(h) {
+    state.pickerHue = ((h % 360) + 360) % 360;
+    els.pickerArea.style.setProperty("--picker-hue", state.pickerHue.toFixed(0));
+    els.hueThumb.style.left = (state.pickerHue / 360 * 100) + "%";
+    els.hueTrack.setAttribute("aria-valuenow", state.pickerHue.toFixed(0));
+  }
+
+  function setPickerSL(s, l) {
+    state.pickerSat = clamp(s, 0, 1);
+    state.pickerLight = clamp(l, 0, 1);
+    const rect = els.pickerArea.getBoundingClientRect();
+    const w = rect.width || 1;
+    const h = rect.height || 1;
+    const x = state.pickerSat * w;
+    const y = (1 - state.pickerLight) * h;
+    els.pickerCursor.style.left = x + "px";
+    els.pickerCursor.style.top = y + "px";
+  }
+
+  function syncPickerFromHex(hex) {
+    const { h, s, l } = rgbToHsl(...Object.values(hexToRgb(hex)));
+    setPickerHue(h);
+    setPickerSL(s, l);
+    els.pickerReadout.textContent = hex;
+  }
+
+  function openPicker() {
+    if (state.pickerOpen) return;
+    state.pickerOpen = true;
+    syncPickerFromHex(state.baseHex);
+    els.picker.hidden = false;
+    els.hexSwatch.setAttribute("aria-expanded", "true");
+    requestAnimationFrame(() => {
+      setPickerHue(state.pickerHue);
+      setPickerSL(state.pickerSat, state.pickerLight);
+    });
+  }
+
+  function closePicker() {
+    if (!state.pickerOpen) return;
+    state.pickerOpen = false;
+    els.picker.hidden = true;
+    els.hexSwatch.setAttribute("aria-expanded", "false");
+  }
+
+  function togglePicker() {
+    if (state.pickerOpen) closePicker();
+    else openPicker();
+  }
+
+  function applyPicker() {
+    const hex = hslToHex(state.pickerHue, state.pickerSat, state.pickerLight);
+    state.baseHex = hex;
+    els.hexInput.value = hex.slice(1);
+    els.hexSwatch.style.background = hex;
+    els.pickerReadout.textContent = hex;
+    setAccent(hex);
+    setHexError("");
+    clearTimeout(debounceId);
+    debounceId = setTimeout(regenerate, 200);
+  }
+
+  function pointerFromEvent(e, el) {
+    const rect = el.getBoundingClientRect();
+    const point = e.touches && e.touches[0] ? e.touches[0] :
+                  e.changedTouches && e.changedTouches[0] ? e.changedTouches[0] : e;
+    return { x: clamp(point.clientX - rect.left, 0, rect.width), y: clamp(point.clientY - rect.top, 0, rect.height), rect };
+  }
+
+  let activeDrag = null;
+
+  function onAreaDown(e) {
+    e.preventDefault();
+    const p = pointerFromEvent(e, els.pickerArea);
+    const s = p.x / p.rect.width;
+    const l = 1 - (p.y / p.rect.height);
+    setPickerSL(s, l);
+    applyPicker();
+    activeDrag = "area";
+    els.pickerArea.setPointerCapture && e.pointerId !== undefined && els.pickerArea.setPointerCapture(e.pointerId);
+    window.addEventListener("mousemove", onAreaMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onAreaMove, { passive: false });
+    window.addEventListener("touchend", onUp);
+  }
+
+  function onAreaMove(e) {
+    if (activeDrag !== "area") return;
+    if (e.cancelable) e.preventDefault();
+    const p = pointerFromEvent(e, els.pickerArea);
+    const s = p.x / p.rect.width;
+    const l = 1 - (p.y / p.rect.height);
+    setPickerSL(s, l);
+    applyPicker();
+  }
+
+  function onHueDown(e) {
+    e.preventDefault();
+    const p = pointerFromEvent(e, els.hueTrack);
+    const hue = (p.x / p.rect.width) * 360;
+    setPickerHue(hue);
+    applyPicker();
+    activeDrag = "hue";
+    window.addEventListener("mousemove", onHueMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onHueMove, { passive: false });
+    window.addEventListener("touchend", onUp);
+  }
+
+  function onHueMove(e) {
+    if (activeDrag !== "hue") return;
+    if (e.cancelable) e.preventDefault();
+    const p = pointerFromEvent(e, els.hueTrack);
+    const hue = (p.x / p.rect.width) * 360;
+    setPickerHue(hue);
+    applyPicker();
+  }
+
+  function onUp() {
+    activeDrag = null;
+    window.removeEventListener("mousemove", onAreaMove);
+    window.removeEventListener("mouseup", onUp);
+    window.removeEventListener("touchmove", onAreaMove);
+    window.removeEventListener("touchend", onUp);
+    window.removeEventListener("mousemove", onHueMove);
+    window.removeEventListener("touchmove", onHueMove);
+  }
+
+  function onHueKey(e) {
+    const step = e.shiftKey ? 10 : 1;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+      e.preventDefault();
+      setPickerHue(state.pickerHue - step);
+      applyPicker();
+    } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+      e.preventDefault();
+      setPickerHue(state.pickerHue + step);
+      applyPicker();
+    }
+  }
+
+  function onAreaKey(e) {
+    const sStep = e.shiftKey ? 0.1 : 0.02;
+    const lStep = e.shiftKey ? 0.1 : 0.02;
+    let s = state.pickerSat, l = state.pickerLight;
+    if (e.key === "ArrowLeft")  { e.preventDefault(); s = clamp(s - sStep, 0, 1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); s = clamp(s + sStep, 0, 1); }
+    else if (e.key === "ArrowUp")    { e.preventDefault(); l = clamp(l + lStep, 0, 1); }
+    else if (e.key === "ArrowDown")  { e.preventDefault(); l = clamp(l - lStep, 0, 1); }
+    else return;
+    setPickerSL(s, l);
+    applyPicker();
+  }
+
+  function onPickerOutside(e) {
+    if (!state.pickerOpen) return;
+    if (els.picker.contains(e.target)) return;
+    if (els.hexSwatch.contains(e.target)) return;
+    closePicker();
+  }
+
+  function onPickerKey(e) {
+    if (e.key === "Escape" && state.pickerOpen) {
+      closePicker();
+      els.hexSwatch.focus();
+    }
+  }
+
   function init() {
     const initial = normalizeHex(els.hexInput.value) || "#3B82F6";
     state.baseHex = initial;
@@ -477,6 +661,18 @@
     els.swatches.addEventListener("keydown", onSwatchKey);
     els.copyAllBtn.addEventListener("click", onCopyAll);
     document.addEventListener("keydown", onKeydown);
+
+    els.hexSwatch.addEventListener("click", togglePicker);
+    els.pickerClose.addEventListener("click", closePicker);
+    els.pickerArea.addEventListener("mousedown", onAreaDown);
+    els.pickerArea.addEventListener("touchstart", onAreaDown, { passive: false });
+    els.pickerArea.addEventListener("keydown", onAreaKey);
+    els.hueTrack.addEventListener("mousedown", onHueDown);
+    els.hueTrack.addEventListener("touchstart", onHueDown, { passive: false });
+    els.hueTrack.addEventListener("keydown", onHueKey);
+    document.addEventListener("mousedown", onPickerOutside);
+    document.addEventListener("touchstart", onPickerOutside, { passive: true });
+    document.addEventListener("keydown", onPickerKey);
   }
 
   if (document.readyState === "loading") {
