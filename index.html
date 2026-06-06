@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light" />
+<meta name="theme-color" content="#EDF1F5" />
+<title>Chroma — Color Palette Generator</title>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<a class="visually-hidden" href="#main">Skip to content</a>
+
+<aside class="sidebar" aria-label="Controls">
+  <header class="brand">
+    <h1 class="brand-mark">Chroma</h1>
+    <p class="brand-sub">Palette generator</p>
+  </header>
+
+  <form id="controls" class="controls" novalidate>
+    <div class="field">
+      <label for="hex-input" class="field-label">Base color</label>
+      <div class="hex-row">
+        <span class="hex-prefix" aria-hidden="true">#</span>
+        <input
+          id="hex-input"
+          class="hex-input"
+          type="text"
+          inputmode="text"
+          autocomplete="off"
+          spellcheck="false"
+          maxlength="7"
+          aria-describedby="hex-error"
+          value="3B82F6"
+        />
+        <span class="hex-swatch" id="hex-swatch" aria-hidden="true"></span>
+      </div>
+      <p class="field-error" id="hex-error" role="alert" aria-live="polite"></p>
+    </div>
+
+    <div class="field">
+      <label for="harmony-select" class="field-label">Harmony</label>
+      <div class="select-wrap">
+        <select id="harmony-select" class="harmony-select" aria-label="Harmony mode">
+          <option value="complementary">Complementary</option>
+          <option value="analogous">Analogous</option>
+          <option value="triadic">Triadic</option>
+          <option value="split-complementary">Split-Complementary</option>
+          <option value="monochromatic" selected>Monochromatic</option>
+        </select>
+      </div>
+    </div>
+
+    <button type="submit" id="generate-btn" class="btn btn-primary">
+      <span>Generate palette</span>
+    </button>
+
+    <button type="button" id="random-btn" class="btn btn-secondary">
+      <span>Random color</span>
+      <kbd class="kbd" aria-hidden="true">R</kbd>
+    </button>
+  </form>
+</aside>
+
+<main id="main" class="main">
+  <section class="palette-section" aria-label="Generated palette">
+    <header class="section-head">
+      <h2 class="section-title">Palette</h2>
+      <p class="section-sub" id="palette-sub">Monochromatic from #3B82F6</p>
+    </header>
+
+    <div class="swatches" id="swatches" role="list"></div>
+  </section>
+
+  <section class="output-section" aria-label="CSS variables output">
+    <header class="output-head">
+      <h2 class="section-title">CSS Variables</h2>
+      <button type="button" id="copy-all-btn" class="copy-all" aria-live="polite">Copy all</button>
+    </header>
+    <pre class="code-block" id="code-block" tabindex="0"><code id="code-content"></code></pre>
+  </section>
+</main>
+
+<script src="app.js" defer></script>
+</body>
+</html>
